@@ -1,9 +1,17 @@
 <?php
 
 /**
+ * The medias of a project.
+ *
+ * The whole card is one link to the media's page. The copy button sits outside
+ * it, in its own column: a link inside a link is invalid and unpredictable, so
+ * the button's column is simply not part of the anchor.
+ *
+ * That is also why the entry-point filename here is text rather than a link —
+ * opening the content is what the media's own page is for.
+ *
  * @var \MediasIndex\View\View $this
  * @var \MediasIndex\View\Urls $urls
- * @var \MediasIndex\View\Embed $embed
  * @var string $clientSlug
  * @var \MediasIndex\Storage\ProjectTotals $project
  * @var \MediasIndex\Storage\MediaPage $medias
@@ -14,80 +22,40 @@ use MediasIndex\View\Format;
 ?>
 <ul class="media-list">
     <?php foreach ($medias->items as $media) {
+        $page = $urls->media($clientSlug, $project->slug, $media->slug);
         $link = $urls->content($clientSlug, $project->slug, $media->slug, $media->entryPath);
-        $thumbnail = $urls->thumbnail($media->thumbFile);
-
-        // Absolute: both the copied link and the snippet are meant to be used
-        // away from this page.
         $absolute = $link === null ? null : $urls->absolute($link);
-        $snippet = $absolute === null ? null : $embed->code($absolute, $media->name);
+        $thumbnail = $urls->thumbnail($media->thumbFile);
         ?>
-        <li>
-            <div class="media">
-                <?php
-                // The thumbnail opens the same dialog as the button beside it,
-                // but with the preview already on — clicking a picture asks to
-                // see the thing, not to read markup about it. A real <button>
-                // rather than a clickable div, so it is reachable by keyboard
-                // and announced as an action.
-                $thumbTag = $snippet === null ? 'div' : 'button';
-                $thumbClass = 'media-thumb' . ($thumbnail === null ? ' is-empty' : '');
-                ?>
-                <<?= $thumbTag ?> class="<?= $thumbClass ?>"
-                    <?php if ($snippet !== null) { ?>
-                        type="button" data-preview
-                        data-embed="<?= $this->e($snippet) ?>"
-                        data-embed-title="<?= $this->e($media->name) ?>"
-                        data-embed-src="<?= $this->e($absolute) ?>"
-                        data-embed-width="<?= (int) $embed->width ?>"
-                        data-embed-height="<?= (int) $embed->height ?>"
-                        aria-label="Aperçu de <?= $this->e($media->name) ?>"
-                    <?php } ?>>
+        <li class="media">
+            <a class="media-link" href="<?= $this->e($page) ?>">
+                <span class="media-thumb<?= $thumbnail === null ? ' is-empty' : '' ?>">
                     <?php if ($thumbnail !== null) { ?>
                         <img src="<?= $this->e($thumbnail) ?>" alt="" loading="lazy" width="400" height="300">
                     <?php } else { ?>
                         <?= $this->render('partials/icon-document') ?>
                     <?php } ?>
-                </<?= $thumbTag ?>>
-                <div class="media-body">
-                    <div class="media-title">
+                </span>
+                <span class="media-body">
+                    <span class="media-title">
                         <span><?= $this->e($media->name) ?></span>
                         <?= $this->render('partials/badge', ['type' => $media->type]) ?>
-                    </div>
-                    <div class="media-meta">
+                    </span>
+                    <span class="media-meta">
                         <?= $this->e(Format::bytes($media->sizeBytes)) ?>
                         · <?= $this->e(Format::plural($media->fileCount, 'fichier', 'fichiers', 'pas de fichier')) ?>
                         · modifié le <?= $this->e(Format::dateTime($media->mtime)) ?>
-                        <?php if ($link !== null) { ?>
-                            · <a href="<?= $this->e($link) ?>" target="_blank" rel="noopener">
-                                <?= $this->e($media->entryPath) ?>
-                            </a>
-                        <?php } else { ?>
-                            · aucun point d'entrée
-                        <?php } ?>
-                    </div>
-                </div>
+                        · <?= $media->isUsable() ? $this->e($media->entryPath) : "aucun point d'entrée" ?>
+                    </span>
+                </span>
+            </a>
 
-                <?php if ($absolute !== null && $snippet !== null) { ?>
-                    <?php // Hidden until app.js runs: a button that cannot work
-                          // without script has no business being visible. ?>
-                    <div class="media-actions">
-                        <?php // The label is wrapped so it can be hidden while
-                              // still holding the button's width open when the
-                              // "copied" message is laid over it. ?>
-                        <button type="button" class="btn btn-small btn-outline"
-                                data-copy="<?= $this->e($absolute) ?>">
-                            <span class="btn-label">Copier le lien</span>
-                        </button>
-                        <?php // No data-preview: opened this way the dialog is
-                              // about the markup, and the preview is a toggle. ?>
-                        <button type="button" class="btn btn-small btn-outline"
-                                data-embed="<?= $this->e($snippet) ?>"
-                                data-embed-title="<?= $this->e($media->name) ?>"
-                                data-embed-src="<?= $this->e($absolute) ?>"
-                                data-embed-width="<?= (int) $embed->width ?>"
-                                data-embed-height="<?= (int) $embed->height ?>">Code d'intégration</button>
-                    </div>
+            <div class="media-actions">
+                <?php if ($absolute !== null) { ?>
+                    <button type="button" class="btn btn-small btn-outline js-only"
+                            data-copy="<?= $this->e($absolute) ?>">
+                        <span class="btn-label">Copier le lien</span>
+                    </button>
                 <?php } ?>
             </div>
         </li>

@@ -101,67 +101,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const dialog = document.getElementById('embed-dialog');
-        const codeElement = dialog?.querySelector('[data-embed-code]');
-        const subjectElement = dialog?.querySelector('[data-embed-subject]');
-        const previewBox = dialog?.querySelector('[data-embed-preview]');
-        const previewToggle = dialog?.querySelector('[data-embed-preview-toggle]');
-
-        /** What the dialog is currently showing, read back when the toggle moves. */
-        let subject = null;
-
-        /**
-         * Built on demand and destroyed when hidden.
-         *
-         * Leaving the frame in place with the box merely hidden would keep the
-         * content loading and playing — which for a virtual tour is tens of
-         * megabytes fetched because someone glanced at a snippet.
-         */
-        function renderPreview(enabled) {
-            if (!previewBox) {
-                return;
-            }
-
-            previewBox.replaceChildren();
-            previewBox.hidden = !enabled || subject === null;
-
-            if (!enabled || subject === null) {
-                return;
-            }
-
-            const frame = document.createElement('iframe');
-            frame.src = subject.src;
-            frame.title = subject.title;
-            frame.setAttribute('allowfullscreen', '');
-            // The real proportions of the snippet, scaled to the dialog.
-            frame.style.aspectRatio = `${subject.width} / ${subject.height}`;
-            previewBox.appendChild(frame);
-        }
-
-        function openDialog(trigger, withPreview) {
-            subject = {
-                src: trigger.dataset.embedSrc ?? '',
-                title: trigger.dataset.embedTitle ?? '',
-                width: Number(trigger.dataset.embedWidth) || 800,
-                height: Number(trigger.dataset.embedHeight) || 600,
-            };
-
-            codeElement.textContent = trigger.dataset.embed;
-
-            if (subjectElement) {
-                subjectElement.textContent = subject.title;
-            }
-
-            if (previewToggle) {
-                previewToggle.checked = withPreview;
-            }
-
-            renderPreview(withPreview);
-            dialog.showModal();
-        }
-
-        // One delegated listener: the media list is re-rendered per page, and
-        // this keeps working whatever it contains.
+        // Copying is the only thing here that needs a script; everything else on
+        // the page is a link or a form and works without one.
         document.addEventListener('click', (event) => {
             const copyButton = event.target.closest('[data-copy]');
 
@@ -170,23 +111,38 @@
                 return;
             }
 
-            const trigger = event.target.closest('[data-embed]');
+            const codeButton = event.target.closest('[data-embed-copy]');
+            const code = document.querySelector('[data-embed-code]');
 
-            if (trigger && dialog && codeElement) {
-                // A thumbnail carries data-preview: clicking a picture asks to
-                // see the thing, not to read markup about it.
-                openDialog(trigger, trigger.hasAttribute('data-preview'));
-                return;
-            }
-
-            const dialogCopy = event.target.closest('[data-embed-copy]');
-
-            if (dialogCopy && codeElement) {
-                copyFromButton(dialogCopy, codeElement.textContent);
+            if (codeButton && code) {
+                copyFromButton(codeButton, code.textContent);
             }
         });
 
-        previewToggle?.addEventListener('change', () => renderPreview(previewToggle.checked));
+        // Selecting the snippet by hand should not mean dragging across it.
+        document.querySelector('.code-block')?.addEventListener('click', (event) => {
+            const code = document.querySelector('[data-embed-code]');
+
+            if (code && !event.target.closest('button')) {
+                selectAll(code);
+            }
+        });
+
+        // The preview loads only when asked for. The frame keeps its size, so
+        // swapping the poster for the iframe moves nothing on the page.
+        document.querySelector('[data-preview-start]')?.addEventListener('click', (event) => {
+            const frame = event.currentTarget.closest('[data-preview]');
+
+            if (!frame) {
+                return;
+            }
+
+            const iframe = document.createElement('iframe');
+            iframe.src = frame.dataset.previewSrc;
+            iframe.title = frame.dataset.previewTitle ?? '';
+            iframe.setAttribute('allowfullscreen', '');
+            frame.replaceChildren(iframe);
+        });
 
         // A scan runs synchronously, so the page simply hangs until it answers.
         // Say so, and stop a second submit from queueing another one behind it.
@@ -194,30 +150,9 @@
             const button = event.currentTarget.querySelector('button[type="submit"]');
 
             if (button) {
-                button.dataset.feedback = 'Indexation…';
+                button.dataset.feedback = 'Indexation\u2026';
                 // After the tick, so disabling cannot cancel this submission.
                 window.setTimeout(() => { button.disabled = true; }, 0);
-            }
-        });
-
-        // Escape, the close buttons and the backdrop all end here.
-        dialog?.addEventListener('close', () => {
-            subject = null;
-            renderPreview(false);
-        });
-
-        // Selecting the snippet by hand should not mean dragging across it.
-        codeElement?.parentElement?.addEventListener('click', (event) => {
-            if (!event.target.closest('button')) {
-                selectAll(codeElement);
-            }
-        });
-
-        // Clicking outside the panel closes it: the backdrop is the dialog
-        // element itself, so a click landing on it is a click on nothing else.
-        dialog?.addEventListener('click', (event) => {
-            if (event.target === dialog) {
-                dialog.close();
             }
         });
     });

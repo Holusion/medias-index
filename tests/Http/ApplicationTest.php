@@ -61,16 +61,44 @@ final class ApplicationTest extends DatabaseTestCase
         self::assertStringNotContainsString('is-selected', $response->body);
     }
 
-    public function testSelectingAProjectListsItsMedias(): void
+    public function testTheProjectPageListsItsMedias(): void
     {
         $this->seedMedia('acme', 'expo', 'salle-1', sizeBytes: 100);
 
-        $response = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']));
+        $response = $this->app()->handle(Request::create('GET', '/c/acme/expo'));
 
         self::assertSame(200, $response->status);
         self::assertStringContainsString('is-selected', $response->body);
         self::assertStringContainsString('salle-1', $response->body);
         self::assertStringContainsString('/files/acme/expo/salle-1/', $response->body);
+    }
+
+    /**
+     * The main column shows the level it is about and nothing above it: the
+     * project page used to open with the client's name as its heading.
+     */
+    public function testAPageHeadingNamesItsOwnLevelOnly(): void
+    {
+        $this->seedMedia('acme', 'expo', 'salle-1');
+
+        $body = $this->app()->handle(Request::create('GET', '/c/acme/expo'))->body;
+
+        preg_match_all('/<h1[^>]*>(.*?)<\/h1>/s', $body, $headings);
+        self::assertCount(1, $headings[1], 'one heading, for the level the page is about');
+
+        // The heading's visible text, not its markup: the back link inside it
+        // legitimately names the parent in its aria-label.
+        preg_match('/<h1[^>]*>.*?<span>(.*?)<\/span>/s', $body, $visible);
+        self::assertSame('expo', $visible[1], 'the heading names this page, not its parent');
+
+        // The parent is still named — in the navbar breadcrumb, which is where
+        // ancestors belong.
+        self::assertStringContainsString('<span>acme</span>', $body);
+
+        // ...and the way back up is the glyph on the heading. Asserted as two
+        // facts, not one string: the attributes wrap across lines in the source.
+        self::assertStringContainsString('class="page-title-back"', $body);
+        self::assertStringContainsString('href="/c/acme"', $body);
     }
 
     /**
@@ -81,7 +109,7 @@ final class ApplicationTest extends DatabaseTestCase
     {
         $this->seedMedia('acme', 'expo', 'salle-1');
 
-        $response = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'ghost']));
+        $response = $this->app()->handle(Request::create('GET', '/c/acme/ghost'));
 
         self::assertSame(404, $response->status);
         self::assertThemedErrorPage($response->body, 404, 'Introuvable');
@@ -208,72 +236,78 @@ final class ApplicationTest extends DatabaseTestCase
         self::assertStringNotContainsString('projet(s)', $body);
     }
 
-    public function testAUsableMediaOffersCopyAndEmbedActions(): void
+    /** The media page is what the embed dialog used to be. */
+    public function testTheMediaPageCarriesTheSnippetAndTheLinks(): void
     {
         $this->seedMedia('acme', 'expo', 'salle-1');
 
-        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+        $response = $this->app()->handle(Request::create('GET', '/c/acme/expo/salle-1'));
 
-        self::assertStringContainsString('data-copy="https://example.test/files/acme/expo/salle-1/"', $body);
-        self::assertStringContainsString('data-embed="&lt;iframe src=', $body);
-        self::assertStringContainsString('<dialog id="embed-dialog"', $body);
+        self::assertSame(200, $response->status);
+        // Absolute: both the copied link and the snippet are used off this site.
+        self::assertStringContainsString('data-copy="https://example.test/files/acme/expo/salle-1/"', $response->body);
+        self::assertStringContainsString('&lt;iframe src=&quot;https://example.test/files/acme/expo/salle-1/', $response->body);
+        self::assertStringContainsString("Code d'intégration", $response->body);
     }
 
     /**
-     * Both the copied link and the snippet are used away from this page, so a
-     * relative URL would be useless the moment it is pasted.
+     * The frame is always on the page but the iframe is not: a virtual tour is
+     * tens of megabytes, and nobody should pay for it by scrolling past.
      */
-    public function testCopiedLinkAndEmbedUseTheAbsoluteOrigin(): void
+    public function testThePreviewFrameIsPresentButUnloaded(): void
     {
         $this->seedMedia('acme', 'expo', 'salle-1');
 
-        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+        $body = $this->app()->handle(Request::create('GET', '/c/acme/expo/salle-1'))->body;
 
-        self::assertStringContainsString('src=&quot;https://example.test/files/acme/expo/salle-1/&quot;', $body);
+        self::assertStringContainsString('class="preview-frame"', $body);
+        self::assertStringContainsString('data-preview-src="/files/acme/expo/salle-1/"', $body);
+        // The frame carries the snippet's ratio, so loading it moves nothing.
+        self::assertStringContainsString('aspect-ratio: 800 / 600', $body);
+        self::assertStringNotContainsString('<iframe', $body);
     }
 
-    /** Nothing to link to means nothing to copy, embed or preview. */
-    public function testAnUnusableMediaOffersNoActions(): void
+    public function testAnUnknownMediaIsA404Page(): void
+    {
+        $this->seedMedia('acme', 'expo', 'salle-1');
+
+        $response = $this->app()->handle(Request::create('GET', '/c/acme/expo/ghost'));
+
+        self::assertSame(404, $response->status);
+        self::assertThemedErrorPage($response->body, 404, 'Introuvable');
+    }
+
+    /** Nothing to link to means nothing to open, copy or embed. */
+    public function testAnUnusableMediaSaysSoOnItsPage(): void
     {
         $this->seedMedia('acme', 'expo', 'broken', entryPath: null);
 
-        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+        $body = $this->app()->handle(Request::create('GET', '/c/acme/expo/broken'))->body;
 
-        self::assertStringNotContainsString('media-actions', $body);
+        self::assertStringContainsString("n'a pas de point d'entrée", $body);
         self::assertStringNotContainsString('data-copy=', $body);
-        self::assertStringContainsString('<div class="media-thumb', $body, 'not a button');
-        self::assertStringNotContainsString('<button class="media-thumb', $body);
+        self::assertStringNotContainsString('code-block', $body);
     }
 
     /**
-     * The thumbnail opens the same dialog as the button beside it, and the
-     * data-preview flag is the only difference: clicking a picture asks to see
-     * the thing, pressing the button asks for the markup.
+     * The whole card is one link to the media's page, and the copy button sits
+     * outside it — a link inside a link is invalid and behaves differently in
+     * every browser.
      */
-    public function testThePreviewableThumbnailIsAButtonCarryingTheEmbedData(): void
+    public function testTheWholeCardIsOneLinkWithTheCopyButtonOutsideIt(): void
     {
         $this->seedMedia('acme', 'expo', 'salle-1');
 
-        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+        $body = $this->app()->handle(Request::create('GET', '/c/acme/expo'))->body;
 
-        // No closing quote: a media without a thumbnail also carries is-empty.
-        self::assertStringContainsString('<button class="media-thumb', $body);
-        self::assertStringContainsString('data-preview', $body);
-        self::assertStringContainsString('aria-label="Aperçu de salle-1"', $body);
-        self::assertStringContainsString('data-embed-src="https://example.test/files/acme/expo/salle-1/"', $body);
-        self::assertStringContainsString('data-embed-width="800"', $body);
-        self::assertStringContainsString('data-embed-height="600"', $body);
-    }
+        self::assertStringContainsString('<a class="media-link" href="/c/acme/expo/salle-1">', $body);
+        self::assertStringContainsString('data-copy="https://example.test/files/acme/expo/salle-1/"', $body);
 
-    /** The button must not carry it, or its dialog would open with a preview. */
-    public function testTheEmbedButtonDoesNotRequestAPreview(): void
-    {
-        $this->seedMedia('acme', 'expo', 'salle-1');
-
-        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
-
-        self::assertSame(1, substr_count($body, 'data-preview'));
-        self::assertStringContainsString('data-embed-preview-toggle', $body);
+        // Nothing else may be a link inside the card's anchor — its contents,
+        // not the match, which necessarily starts with the opening tag.
+        preg_match('/<a class="media-link"[^>]*>(.*?)<\/a>/s', $body, $anchor);
+        self::assertStringNotContainsString('<a ', $anchor[1], 'no nested anchors');
+        self::assertStringNotContainsString('?preview', $body);
     }
 
     /** Media names come from disk and manifests, so they are never trusted. */
@@ -282,7 +316,7 @@ final class ApplicationTest extends DatabaseTestCase
         $this->seedMedia('acme', 'expo', 'x');
         $this->pdo->exec('UPDATE medias SET name = \'<script>alert(1)</script>\'');
 
-        $response = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']));
+        $response = $this->app()->handle(Request::create('GET', '/c/acme/expo'));
 
         self::assertStringNotContainsString('<script>alert(1)</script>', $response->body);
         self::assertStringContainsString('&lt;script&gt;', $response->body);

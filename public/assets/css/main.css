@@ -568,10 +568,11 @@ a {
 }
 
 /* ==========================================================================
-   Media cards — thumbnail on the left, details on the right
+   Media cards — one link per card, with the copy button carved out
 
-   The thumbnail box keeps its size whether or not an image exists, so a listing
-   where only some medias have one still lines up.
+   The whole card leads to the media's page. The button lives in its own column,
+   outside the anchor: a link inside a link is invalid and behaves differently in
+   every browser, so the column is simply not part of it.
    ========================================================================== */
 
 .media-list {
@@ -579,7 +580,10 @@ a {
     margin: 0;
     padding: 0;
 
-    & > li {
+    & > .media {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
         border-bottom: 1px solid var(--color-border);
 
         &:last-child {
@@ -587,41 +591,29 @@ a {
         }
     }
 
-    & .media {
+    & .media-link {
         display: grid;
-        grid-template-columns: 120px minmax(0, 1fr) auto;
+        grid-template-columns: 120px minmax(0, 1fr);
         gap: var(--gap);
         align-items: center;
         padding: 0.7rem 0.8rem;
+        color: var(--color-text);
+        text-decoration: none;
+
+        &:hover,
+        &:focus-visible {
+            background-color: var(--color-hover);
+            color: var(--color-text);
+            text-decoration: none;
+        }
     }
 
-    /* Hidden until app.js has run: these do nothing without it, and a dead
-       button is worse than an absent one. */
-    & .media-actions {
-        display: none;
-        gap: 0.4rem;
-        align-items: center;
-    }
-
-    /* Also rendered as a <button> when the media can be previewed, hence the
-       reset: it must look identical either way. */
     & .media-thumb {
-        appearance: none;
-        padding: 0;
-        border: 0;
+        display: block;
         aspect-ratio: 4 / 3;
         background-color: var(--color-element);
         border-radius: var(--radius);
         overflow: hidden;
-
-        &:is(button) {
-            cursor: pointer;
-
-            &:hover > img,
-            &:focus-visible > img {
-                opacity: 0.85;
-            }
-        }
 
         & > img {
             width: 100%;
@@ -645,6 +637,11 @@ a {
         }
     }
 
+    & .media-body {
+        display: block;
+        min-width: 0;
+    }
+
     & .media-title {
         display: flex;
         flex-wrap: wrap;
@@ -654,22 +651,22 @@ a {
     }
 
     & .media-meta {
+        display: block;
         color: var(--color-text-muted);
         font-size: 0.8125rem;
     }
 
-    .has-js & .media-actions {
+    /* Top-right, and outside the link. */
+    & .media-actions {
         display: flex;
+        gap: 0.4rem;
+        align-items: center;
+        padding: 0.7rem 0.8rem;
     }
 
     @media (max-width: 768px) {
-        & .media {
+        & .media-link {
             grid-template-columns: 72px minmax(0, 1fr);
-        }
-
-        /* Too narrow for a third column; the actions take their own row. */
-        & .media-actions {
-            grid-column: 1 / -1;
         }
     }
 }
@@ -709,76 +706,132 @@ a {
 }
 
 /* ==========================================================================
-   Dialog — native <dialog>, opened with showModal()
+   Page title
 
-   Escape and the backdrop close it for free; only the styling is ours.
+   The current level only — ancestors are the sidebar's breadcrumb. The back
+   glyph is the one exception, and goes up exactly one level.
    ========================================================================== */
 
-.dialog {
-    width: min(100% - 2rem, 46rem);
-    /* The preview keeps the snippet's true proportions, which at 800×600 is
-       taller than a short window. Cap the panel and let it scroll rather than
-       pushing the code and the buttons off-screen. */
-    max-height: 90dvh;
-    overflow-y: auto;
-    padding: var(--gap);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background-color: var(--color-background);
-    color: var(--color-text);
+.page-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
 
-    &::backdrop {
-        background-color: rgba(0, 0, 0, 0.6);
-    }
+    & > .page-title-back {
+        flex: none;
+        display: inline-flex;
+        align-self: center;
+        color: var(--color-text-muted);
 
-    & > .dialog-head {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: var(--gap);
+        &:hover,
+        &:focus-visible {
+            color: var(--color-primary);
+        }
 
-        & h2 {
-            margin: 0 0 0.5rem;
-            padding-left: 0;
-            border-left: none;
+        & > .icon {
+            display: block;
+            width: 1.4rem;
+            height: 1.4rem;
         }
     }
 
-    /* The shared toolbar spacing would leave a gap below the last row. */
-    & > .toolbar:last-child {
-        margin-bottom: 0;
+    & > span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+}
+
+/* ==========================================================================
+   Preview — rigid frame, loaded on demand
+
+   The frame holds the snippet's aspect ratio whether it contains the poster or
+   the iframe, so starting the preview swaps what is inside the box and nothing
+   below it moves. The iframe is only created when asked for: a virtual tour is
+   tens of megabytes, and nobody should pay for it by scrolling past.
+   ========================================================================== */
+
+.preview {
+    margin: 0 0 var(--gap);
+}
+
+.preview-frame {
+    position: relative;
+    background-color: var(--color-element);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+
+    /* Poster and iframe alike fill the frame exactly. */
+    & > .preview-poster,
+    & > iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
     }
 
-    & > .dialog-preview {
-        margin: 0 0 var(--gap);
-        background-color: var(--color-element);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius);
-        overflow: hidden;
+    & > .preview-poster {
+        object-fit: cover;
 
-        & > iframe {
-            display: block;
-            width: 100%;
-            /* Height comes from the aspect ratio app.js sets from the snippet's
-               own dimensions, so the preview is proportioned like the embed. */
-            border: 0;
+        &.is-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            & > .icon-document {
+                width: 20%;
+                height: 20%;
+                color: var(--color-text-muted);
+                opacity: 0.55;
+            }
         }
     }
 }
 
-/* A plain checkbox with the accent colour: no custom control to keep working. */
-.switch {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0 0 var(--gap);
-    font-size: 0.875rem;
-    cursor: pointer;
+/* Hidden until app.js has run: without it there is nothing to load the frame
+   with, and "Ouvrir" is the way through. */
+.preview-play {
+    display: none;
+}
 
-    & > input {
-        accent-color: var(--color-primary);
-        cursor: pointer;
+.has-js .preview-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    width: 4.5rem;
+    height: 4.5rem;
+    padding: 0;
+    border: 2px solid var(--color-text);
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.55);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+        background-color: var(--color-primary);
+        border-color: var(--color-primary);
+        color: var(--holusion-black);
     }
+
+    & > .icon {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+}
+
+/* Controls that cannot work without the script are absent until it has run. */
+.js-only {
+    display: none;
+}
+
+.has-js .js-only {
+    display: inline-flex;
 }
 
 /* ==========================================================================

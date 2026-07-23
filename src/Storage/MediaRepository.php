@@ -70,6 +70,30 @@ final class MediaRepository
         );
     }
 
+    public function findBySlug(int $projectId, string $slug): ?MediaRow
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM medias
+             WHERE project_id = ? AND slug = ? AND deleted_at IS NULL',
+        );
+        $statement->execute([$projectId, $slug]);
+        $row = $statement->fetch();
+
+        return $row === false ? null : self::hydrate($row);
+    }
+
+    /** Every live media of a project, for the sidebar of a media's own page. */
+    public function listForProject(int $projectId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM medias
+             WHERE project_id = ? AND deleted_at IS NULL ORDER BY name, id',
+        );
+        $statement->execute([$projectId]);
+
+        return array_map(self::hydrate(...), $statement->fetchAll());
+    }
+
     public function upsert(
         int $projectId,
         string $slug,

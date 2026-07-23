@@ -37,12 +37,18 @@ final readonly class Urls
 
     public function project(string $clientSlug, string $projectSlug): string
     {
-        return $this->client($clientSlug) . '?p=' . rawurlencode($projectSlug);
+        return $this->client($clientSlug) . '/' . rawurlencode($projectSlug);
     }
 
     public function projectPage(string $clientSlug, string $projectSlug, int $page): string
     {
-        return $this->project($clientSlug, $projectSlug) . '&page=' . $page;
+        return $this->project($clientSlug, $projectSlug) . '?page=' . $page;
+    }
+
+    /** A media's own page: its embed code, and a preview it can load on demand. */
+    public function media(string $clientSlug, string $projectSlug, string $mediaSlug): string
+    {
+        return $this->project($clientSlug, $projectSlug) . '/' . rawurlencode($mediaSlug);
     }
 
     /** Directory of a media, always with a trailing slash. */

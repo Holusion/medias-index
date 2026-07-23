@@ -56,11 +56,15 @@ final class UrlsTest extends TestCase
         );
     }
 
-    public function testClientAndProjectLinks(): void
+    /** The hierarchy is a path, so every level is a link someone can send. */
+    public function testEachLevelIsItsOwnUrl(): void
     {
-        self::assertSame('/c/acme', $this->urls()->client('acme'));
-        self::assertSame('/c/acme?p=expo%20d%27art', $this->urls()->project('acme', "expo d'art"));
-        self::assertSame('/c/acme?p=expo&page=3', $this->urls()->projectPage('acme', 'expo', 3));
+        $urls = $this->urls();
+
+        self::assertSame('/c/acme', $urls->client('acme'));
+        self::assertSame('/c/acme/expo%20d%27art', $urls->project('acme', "expo d'art"));
+        self::assertSame('/c/acme/expo?page=3', $urls->projectPage('acme', 'expo', 3));
+        self::assertSame('/c/acme/expo/salle-1', $urls->media('acme', 'expo', 'salle-1'));
     }
 
     public function testThumbnailsAreOptional(): void

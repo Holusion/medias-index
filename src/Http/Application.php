@@ -11,6 +11,8 @@ use MediasIndex\Http\Controller\AdminController;
 use MediasIndex\Http\Controller\ClientController;
 use MediasIndex\Http\Controller\DoctorController;
 use MediasIndex\Http\Controller\ErrorController;
+use MediasIndex\Http\Controller\MediaController;
+use MediasIndex\Http\Controller\ProjectController;
 use MediasIndex\Http\Controller\ScanController;
 use MediasIndex\Http\Controller\StyleguideController;
 use MediasIndex\Indexer\Scanner;
@@ -71,7 +73,9 @@ final class Application
         $medias = new MediaRepository($pdo, new LikeSearch());
 
         $admin = new AdminController($clients, new ScanRepository($pdo), $view, $guard);
-        $client = new ClientController($clients, $projects, $medias, $view, $guard);
+        $client = new ClientController($clients, $projects, $view, $guard);
+        $project = new ProjectController($clients, $projects, $medias, $view, $guard);
+        $media = new MediaController($clients, $projects, $medias, $view, $guard);
         $styleguide = new StyleguideController($clients, $view, $guard);
         $doctor = new DoctorController($guard);
         $scan = new ScanController(
@@ -86,6 +90,8 @@ final class Application
         $router = new Router();
         $router->get('/', $admin->index(...));
         $router->get('/c/{client}', $client->show(...));
+        $router->get('/c/{client}/{project}', $project->show(...));
+        $router->get('/c/{client}/{project}/{media}', $media->show(...));
         $router->get('/styleguide', $styleguide->show(...));
         $router->get('/doctor', $doctor->show(...));
         $router->post('/scan', $scan->trigger(...));

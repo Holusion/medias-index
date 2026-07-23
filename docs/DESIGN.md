@@ -367,11 +367,40 @@ placeholder in the UI. None of it interrupts the scan.
 
 | Route | Page |
 |---|---|
-| `GET /` | admin index — clients, total size, project names + individual sizes |
-| `GET /c/{client}` | client index — projects with last modified, size, media count, media types |
-| `GET /c/{client}/{project}` | project index — paginated, searchable media list |
-| `GET /thumb/{id}` | thumbnail fallback (regenerates on cache miss) |
-| `POST /hook/scan` | trigger a scan, shared-secret token |
+| `GET /` | overview — clients, totals, last scan, the scan button |
+| `GET /c/{client}` | a client — its projects in the sidebar, its figures in main |
+| `GET /c/{client}/{project}` | a project — paginated, searchable media list |
+| `GET /c/{client}/{project}/{media}` | a media — embed code, and a preview loaded on demand |
+| `GET /styleguide`, `GET /doctor` | the component reference, the environment check |
+| `POST /scan` | the overview's button — guarded, same-origin only |
+| `POST /hook/scan` | for machines — shared-secret token |
+
+**Every level is a path, so every level is a link.** A media's page is what an
+embed dialog would otherwise have been: people send each other "here is the code
+for this", and a modal is not something you can send.
+
+**The preview loads on demand, and the frame does not move when it does.** The
+frame is always in the page, holding the snippet's aspect ratio, with the
+thumbnail inside it and a play button over that; pressing play swaps the poster
+for the iframe inside the same box. Two things follow from that shape: a virtual
+tour of tens of megabytes is never fetched by someone who merely scrolled past,
+and nothing below the frame shifts under the pointer at the moment it loads.
+
+**A card is one link.** On a project page the whole card leads to the media, with
+the copy button in its own column *outside* the anchor — a link inside a link is
+invalid and behaves differently in every browser. That is also why the
+entry-point filename is plain text there: opening the content is what the media's
+own page is for.
+
+**The main column shows one level, and never its ancestors.** Those are in the
+navbar and in the sidebar's breadcrumb. Stacking them as headings made the
+project page open with the client's name, so every page read as though it were
+about its parent. The only concession is a back glyph prefixing the heading,
+going up exactly one level.
+
+The sidebar lists what is *inside* the location its breadcrumb names, so it
+shifts one level deeper on a media's page: `home › client › project`, listing
+that project's medias.
 
 The project index shows, per media: thumbnail, folder name, ctime/mtime, size,
 type, a link to the content and a ready-to-copy `<iframe>` snippet. Pagination is
