@@ -1,0 +1,11 @@
+# The repository is deployed inside the document root (www/app), so everything
+# in it is reachable over HTTP unless denied here. Only public/ is meant to be
+# served; www/.htaccess rewrites requests to public/index.php.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

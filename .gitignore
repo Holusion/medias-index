@@ -1,0 +1,19 @@
+# Installed by CI (composer install --no-dev) and never committed.
+/vendor/
+
+# Local, per-installation configuration. In production this file should not
+# live here at all — see the config search path in src/Support/Config.php.
+/config/config.php
+
+# Runtime scratch space
+/var/
+.phpunit.result.cache
+
+# Local sample content and its generated thumbnails, mounted into the docker
+# environment as the www/files and www/thumbs of production. Stands in for real
+# client content, which does not belong in the repository.
+# Recreate with: docker compose exec web php dev/sample-files.php
+/files/
+/thumbs/
+
+.DS_Store

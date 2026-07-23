@@ -1,0 +1,55 @@
+# Local development environment. Run from the repository root.
+#
+# Mirrors the production layout described in docs/DESIGN.md:
+#
+#   /var/www/html/          <- OVH "www" document root
+#     .htaccess             <- copied from app/deploy/www.htaccess at startup
+#     files/                <- indexed content
+#     thumbs/               <- generated thumbnails
+#     app/                  <- this repository
+#
+name: medias-index
+
+services:
+  web:
+    build: ./docker/php
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./:/var/www/html/app
+      # Both are gitignored local scratch. Populate files/ with:
+      #   docker compose exec web php dev/sample-files.php
+      - ./files:/var/www/html/files
+      - ./thumbs:/var/www/html/thumbs
+    environment:
+      MEDIAS_INDEX_CONFIG: /var/www/html/app/config/config.dev.php
+      # Integration tests skip themselves when this is absent, so the suite
+      # still runs anywhere without a database.
+      MEDIAS_INDEX_TEST_DSN: mysql:host=db;dbname=medias_index_test;charset=utf8mb4
+      MEDIAS_INDEX_TEST_USER: medias
+      MEDIAS_INDEX_TEST_PASSWORD: medias
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: medias_index
+      MYSQL_USER: medias
+      MYSQL_PASSWORD: medias
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-umedias", "-pmedias"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  db-data:

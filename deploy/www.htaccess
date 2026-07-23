@@ -1,0 +1,68 @@
+# Install this file as www/.htaccess on the host — it lives one level ABOVE the
+# deployed repository so that a deployment copy never overwrites it.
+#
+#   www/
+#     .htaccess   <- this file
+#     files/      <- indexed content, served straight from disk
+#     thumbs/     <- generated thumbnails, served straight from disk
+#     app/        <- the repository
+#
+# Everything that is not real content is handed to the app's front controller.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Content and thumbnails are served by Apache, never by PHP.
+    RewriteRule ^files/ - [L]
+    RewriteRule ^thumbs/ - [L]
+
+    # Never expose the application internals directly.
+    RewriteRule ^app/(?!public/) - [F,L]
+
+    # The local configuration, if it lives here (option 3 of the search path in
+    # src/Support/Config.php). This must come before the catch-all below: the
+    # <Files> section further down is evaluated against the file the request was
+    # *rewritten to*, so on its own it would never match this one.
+    RewriteRule ^config\.php$ - [F,L]
+
+    # Existing files inside app/public (CSS, JS) are served as-is.
+    RewriteCond %{DOCUMENT_ROOT}/app/public/$1 -f
+    RewriteRule ^(.+)$ app/public/$1 [L]
+
+    # Everything else goes to the front controller.
+    RewriteRule ^ app/public/index.php [L]
+</IfModule>
+
+# Second line of defence for the same file, for the case where mod_rewrite is
+# unavailable and the rule above never runs. Harmless when the file is absent.
+<Files "config.php">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</Files>
+
+# index.html first: a media's link is its directory URL, and that is what has to
+# resolve to the media's own entry point. The app itself is never reached this
+# way — the rewrite above sends it to app/public/index.php before DirectoryIndex
+# is ever consulted.
+DirectoryIndex index.html index.php
+
+# Errors Apache answers by itself never reach PHP routing: a stale link to a
+# media that has been deleted, or a refused directory listing, are both served
+# straight from /files/. Pointing them at the app gives them the same page as an
+# error the application raised, instead of the bare server default.
+#
+# Apache keeps the original status code — the app sets the same one from the URL,
+# so both agree however the page was reached.
+ErrorDocument 400 /error/400
+ErrorDocument 403 /error/403
+ErrorDocument 404 /error/404
+ErrorDocument 500 /error/500
+ErrorDocument 503 /error/503
+
+# Directory listings of the content tree are not wanted; the app is the index.
+Options -Indexes

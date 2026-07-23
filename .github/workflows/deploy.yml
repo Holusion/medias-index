@@ -1,0 +1,107 @@
+name: test & deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Never let two deployments write to the hosting space at once.
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Without a database the migration tests would silently skip, which is the
+    # same as not having written them.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: medias_index_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      MEDIAS_INDEX_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=medias_index_test;charset=utf8mb4
+      MEDIAS_INDEX_TEST_USER: root
+      MEDIAS_INDEX_TEST_PASSWORD: root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          # Lowest version the app supports, so CI catches anything that needs
+          # a newer one. The host may well run something more recent.
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, gd, json, mbstring
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Validate composer files
+        run: composer validate --strict
+
+      - name: Tests
+        run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, gd, json, mbstring
+          coverage: none
+
+      - name: Install runtime dependencies only
+        # --no-dev is the whole reason vendor/ is not committed: PHPUnit and its
+        # ~25 transitive packages never reach the hosting space.
+        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+      - name: Upload to OVH
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          protocol: sftp
+          port: 22
+          server: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          local-dir: ./
+          # Trailing slash is required by the action.
+          server-dir: www/app/
+          # Only changed files are transferred; the action keeps a state file
+          # on the server to work out the diff.
+          state-name: .deploy-state.json
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/docker/**
+            **/dev/**
+            **/docs/**
+            **/tests/**
+            **/config/config.php
+            **/config/config.dev.php
+            **/compose.yml
+            **/phpunit.xml.dist
+            **/var/**
+            **/.editorconfig
+            **/files/**
+            **/thumbs/**

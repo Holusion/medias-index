@@ -1,0 +1,19 @@
+# Re-allow access to the one directory that is meant to be public, undoing the
+# blanket denial in app/.htaccess.
+
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Allow from all
+</IfModule>
+
+# Also works when this directory is reached directly (e.g. if the hosting's
+# document root is pointed at app/public instead of www).
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>

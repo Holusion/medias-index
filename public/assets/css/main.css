@@ -1,0 +1,668 @@
+/**
+ * medias-index — base stylesheet.
+ *
+ * Look and feel follows eCorpus (dark UI, serif headings with accent borders,
+ * flat buttons, semantic custom properties), recoloured with the holusion.com
+ * palette. No CSS framework, no build step, no font files: this is an
+ * administrative interface, so it stays small enough to read in one sitting.
+ *
+ * Structure: only global element rules and one block per page section live at
+ * the root scope. Everything else is nested inside its section, so a section can
+ * be understood — or deleted — on its own.
+ *
+ * Native CSS nesting is used throughout, and the mobile breakpoint is 768px
+ * everywhere (custom properties cannot be used in media queries).
+ */
+
+/* ==========================================================================
+   Custom properties
+   ========================================================================== */
+
+:root {
+    /* Palette, verbatim from holusion.com/_css/_variables.scss ------------- */
+    --holusion-dark-blue: #103040;
+    --holusion-blue: #00517d;
+    --holusion-cyan: #00a5e8;
+    --holusion-cyan-light: #2fafe6;
+    --holusion-orange: #f57600;
+    --holusion-black: #0b0b0b;
+    --holusion-grey: #707070;
+    --holusion-grey-light: #eeeeee;
+
+    /* Semantic roles. Named after eCorpus's own variables so the two remain
+       comparable; only the values differ. Always style against these, never
+       against the palette above. */
+    --color-primary: var(--holusion-cyan);
+    --color-primary-light: var(--holusion-cyan-light);
+    --color-primary-dark: var(--holusion-blue);
+    --color-secondary: var(--holusion-orange);
+    --color-secondary-light: color-mix(in oklch, var(--color-secondary), white 25%);
+
+    --color-background: var(--holusion-dark-blue);
+    --color-text: #e7eef3;
+    --color-text-muted: #9ab0bf;
+
+    /* Backgrounds that stand out over --color-background: "section" for large
+       page chunks, "element" for cards, navbars and list items. */
+    --color-section: rgba(0, 0, 0, 0.15);
+    --color-element: rgba(0, 0, 0, 0.25);
+    --color-border: rgba(255, 255, 255, 0.12);
+    --color-hover: rgba(255, 255, 255, 0.07);
+
+    --color-info: #73adff;
+    --color-success: #8ae65c;
+    --color-warning: #e6a345;
+    --color-error: #e64545;
+
+    /* Media type identity colours.
+       Checked for colourblind separation against this surface: worst adjacent
+       pair ΔE 22.9 protan / 27.9 tritan, all above 3:1 contrast. "unknown" is
+       deliberately near-neutral — it marks the absence of a recognised type
+       rather than being one more identity — so it is excluded from that set.
+       Every badge carries its label too, so colour is never the only signal. */
+    --type-unknown: #63879b;
+    --type-html: #0d92c9;
+    --type-krpano: #c96b12;
+
+    /* No font is shipped or fetched — these are fallback chains over what the
+       system already has. The serif headings are what make it read as eCorpus. */
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Open Sans",
+        "Liberation Sans", Arial, sans-serif;
+    --font-heading: "Noto Serif", "Liberation Serif", Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+    /* Metrics */
+    --aside-width: 300px;
+    --content-width: 1280px;
+    --nav-height: 52px;
+    --gap: 1rem;
+    --radius: 3px;
+}
+
+/* ==========================================================================
+   Reset and base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+code,
+pre {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+}
+
+/* ==========================================================================
+   Typography
+
+   The thick accent border under h1 and beside h2 is eCorpus's signature; it is
+   kept, but left-aligned rather than centred, which suits a dense admin screen.
+   ========================================================================== */
+
+h1,
+h2,
+h3 {
+    font-family: var(--font-heading);
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+h1 {
+    margin: 0 0 1.5rem;
+    padding: 0.5rem 0 0.3rem;
+    font-size: 1.9rem;
+    border-bottom: 0.35rem solid var(--color-primary);
+}
+
+h2 {
+    margin: 2rem 0 1rem;
+    padding-left: 0.8rem;
+    font-size: 1.4rem;
+    border-left: 0.5rem solid var(--color-primary);
+}
+
+h3 {
+    margin: 1.5rem 0 0.5rem;
+    font-size: 1.15rem;
+    color: var(--color-primary-light);
+}
+
+p {
+    margin: 0 0 1rem;
+}
+
+/* Secondary information: timestamps, sizes, counts. */
+.muted {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Links
+   ========================================================================== */
+
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--color-primary-light);
+        text-decoration: underline;
+    }
+}
+
+:where(a, button, input, select, summary):focus-visible {
+    outline: 2px solid var(--color-primary-light);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Buttons
+
+   Flat, square-ish and colour-driven, like eCorpus. Variants set --btn-color
+   and inherit everything else.
+   ========================================================================== */
+
+.btn {
+    /* Lifted off the background rather than the translucent black used for
+       panels: a button tinted with --color-element is unreadable here. */
+    --btn-color: color-mix(in oklch, var(--color-background), white 20%);
+    --btn-color-hover: color-mix(in oklch, var(--btn-color), white 15%);
+    --btn-text-color: var(--color-text);
+    /* Border of the outline variant, and what it fills with on hover. Kept
+       separate from --btn-color so solid and outline can each stay legible. */
+    --btn-outline-color: var(--color-primary);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.45rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background-color: var(--btn-color);
+    color: var(--btn-text-color);
+    font: inherit;
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+        background-color: var(--btn-color-hover);
+        color: var(--btn-text-color);
+        text-decoration: none;
+    }
+
+    /* --- Colour variants --- */
+
+    &.btn-primary {
+        --btn-color: var(--color-primary-dark);
+        --btn-color-hover: var(--color-primary);
+        --btn-outline-color: var(--color-primary);
+    }
+
+    &.btn-secondary {
+        --btn-color: var(--color-secondary);
+        --btn-color-hover: var(--color-secondary-light);
+        --btn-outline-color: var(--color-secondary);
+        --btn-text-color: var(--holusion-black);
+    }
+
+    &.btn-danger {
+        --btn-color: var(--color-error);
+        --btn-outline-color: var(--color-error);
+        --btn-text-color: var(--holusion-black);
+    }
+
+    /* --- Modifiers --- */
+
+    /* Text stays light so the button reads at any variant colour; the variant
+       shows in the border, and takes over the background on hover. */
+    &.btn-outline {
+        background-color: transparent;
+        border-color: var(--btn-outline-color);
+        color: var(--color-text);
+
+        &:hover,
+        &:focus-visible {
+            background-color: var(--btn-outline-color);
+            color: var(--btn-text-color);
+        }
+    }
+
+    &.btn-small {
+        padding: 0.15rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    &[disabled],
+    &.disabled {
+        pointer-events: none;
+        filter: saturate(0.4) opacity(0.6);
+    }
+}
+
+/* ==========================================================================
+   Page frame
+
+   Header / content / footer. Deliberately not modelled on either reference
+   site — it only has to frame an admin tool.
+   ========================================================================== */
+
+.page {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100dvh;
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    min-height: var(--nav-height);
+    padding: 0 var(--gap);
+    background-color: var(--color-element);
+    border-bottom: 3px solid var(--color-primary-dark);
+
+    & > .brand {
+        font-family: var(--font-heading);
+        font-size: 1.1rem;
+        color: var(--color-text);
+        white-space: nowrap;
+
+        &:hover {
+            text-decoration: none;
+            color: var(--color-primary-light);
+        }
+    }
+
+    /* Breadcrumb-style navigation, fed by the current route. */
+    & > .nav {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-width: 0;
+        overflow: hidden;
+
+        & > a,
+        & > span {
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+
+        & > .separator {
+            color: var(--color-text-muted);
+        }
+    }
+
+    & > .spacer {
+        margin-left: auto;
+    }
+}
+
+.page-main {
+    width: min(100% - 2 * var(--gap), var(--content-width));
+    margin-inline: auto;
+    padding: var(--gap) 0 3rem;
+}
+
+.page-footer {
+    padding: var(--gap);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+/* ==========================================================================
+   App body — flush-left sidebar beside the centred content
+
+   The sidebar is part of the window frame, not of the content column: it sits
+   against the left edge of the viewport and stays put while the main column
+   scrolls. Main content keeps its own centred measure inside the remaining
+   space.
+
+   Two modifiers, each doing one thing:
+     .is-split     the sidebar and main are alternative views of the same thing
+                   (the client page), so below 768px they become mutually
+                   exclusive. Without it they simply stack, which is what the
+                   index wants — its stats must stay reachable on a phone.
+     .is-selected  something is selected, so main wins and the back link shows.
+   Both are set server-side from the URL; no script is involved.
+   ========================================================================== */
+
+.app-body {
+    display: grid;
+    grid-template-columns: var(--aside-width) minmax(0, 1fr);
+    align-items: start;
+
+    & > .sidebar {
+        position: sticky;
+        top: 0;
+        align-self: stretch;
+        min-width: 0;
+        max-height: 100dvh;
+        overflow-y: auto;
+        padding: var(--gap) 0;
+        background-color: var(--color-section);
+        border-right: 1px solid var(--color-border);
+
+        & > .sidebar-title {
+            margin: 0 0 0.5rem;
+            padding: 0 0.8rem;
+            color: var(--color-text-muted);
+            font-family: var(--font-body);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+    }
+
+    /* Pages without a sidebar — the error pages — give the whole width to the
+       content rather than leaving an empty column. */
+    &.has-no-sidebar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Only ever shown on a narrow viewport with something selected. */
+    & .sidebar-back {
+        display: none;
+        margin-bottom: var(--gap);
+    }
+
+    @media (max-width: 768px) {
+        grid-template-columns: minmax(0, 1fr);
+
+        & > .sidebar {
+            position: static;
+            max-height: none;
+            border-right: none;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        &.is-split {
+            & > .page-main {
+                display: none;
+            }
+
+            &.is-selected {
+                & > .sidebar {
+                    display: none;
+                }
+
+                & > .page-main {
+                    display: block;
+                }
+
+                & .sidebar-back {
+                    display: inline-flex;
+                }
+            }
+        }
+    }
+}
+
+/* ==========================================================================
+   Statistics — stat tiles, not a chart
+
+   A handful of headline figures has no shape to plot, so it stays a set of
+   tiles. The value wears the body sans, never the serif heading face (a serif
+   figure reads as decoration), and uses the font's default proportional
+   figures — tabular-nums is for columns that must align, not for standalone
+   numbers. Colour stays on the accent border; the text keeps text tokens.
+   ========================================================================== */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: var(--gap);
+    margin: 0 0 2rem;
+
+    & > .stat {
+        padding: 0.8rem 1rem;
+        background-color: var(--color-section);
+        border-left: 3px solid var(--color-primary);
+        border-radius: var(--radius);
+
+        & > .stat-label {
+            display: block;
+            color: var(--color-text-muted);
+            font-size: 0.8125rem;
+        }
+
+        & > .stat-value {
+            display: block;
+            font-family: var(--font-body);
+            font-size: 1.75rem;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        & > .stat-unit {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+    }
+}
+
+/* ==========================================================================
+   Toolbar — a row of actions under a title
+   ========================================================================== */
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 2rem;
+}
+
+/* ==========================================================================
+   Item list — projects in the aside, and any other vertical list of records
+   ========================================================================== */
+
+.item-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    & > li {
+        border-bottom: 1px solid var(--color-border);
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    /* The whole row is the link, so the hit area matches the highlight. */
+    & .item {
+        display: block;
+        padding: 0.6rem 0.8rem;
+        color: var(--color-text);
+        border-left: 3px solid transparent;
+
+        &:hover,
+        &:focus-visible {
+            background-color: var(--color-hover);
+            color: var(--color-text);
+            text-decoration: none;
+        }
+
+        &.is-active {
+            background-color: var(--color-hover);
+            border-left-color: var(--color-primary);
+        }
+
+        & > .item-name {
+            display: block;
+        }
+
+        & > .item-meta {
+            display: block;
+            color: var(--color-text-muted);
+            font-size: 0.8125rem;
+        }
+    }
+}
+
+/* ==========================================================================
+   Media cards — thumbnail on the left, details on the right
+
+   The thumbnail box keeps its size whether or not an image exists, so a listing
+   where only some medias have one still lines up.
+   ========================================================================== */
+
+.media-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    & > li {
+        border-bottom: 1px solid var(--color-border);
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    & .media {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: var(--gap);
+        align-items: center;
+        padding: 0.7rem 0.8rem;
+    }
+
+    & .media-thumb {
+        aspect-ratio: 4 / 3;
+        background-color: var(--color-element);
+        border-radius: var(--radius);
+        overflow: hidden;
+
+        & > img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    }
+
+    & .media-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 1.05rem;
+    }
+
+    & .media-meta {
+        color: var(--color-text-muted);
+        font-size: 0.8125rem;
+    }
+
+    @media (max-width: 768px) {
+        & .media {
+            grid-template-columns: 72px minmax(0, 1fr);
+        }
+    }
+}
+
+/* ==========================================================================
+   Media type badge
+
+   One modifier per type. An unrecognised type falls back to the neutral, so a
+   row written by a newer version than this stylesheet still renders sensibly
+   rather than losing its background entirely.
+   ========================================================================== */
+
+.badge {
+    --badge-color: var(--type-unknown);
+
+    display: inline-block;
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    background-color: var(--badge-color);
+    /* Dark ink on every variant: the fills sit in a lightness band where dark
+       text clears 5:1 and light text would not. */
+    color: var(--holusion-black);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: 0.05em;
+
+    &.badge-html {
+        --badge-color: var(--type-html);
+    }
+
+    &.badge-krpano {
+        --badge-color: var(--type-krpano);
+    }
+}
+
+/* ==========================================================================
+   Error page
+
+   Also reached through Apache's ErrorDocument directives, so a 404 on a stale
+   content link looks like one raised by the application itself.
+   ========================================================================== */
+
+.error-page {
+    padding: 2.5rem var(--gap);
+    background-color: var(--color-section);
+    border-radius: var(--radius);
+    text-align: center;
+
+    & > .error-code {
+        display: block;
+        /* Sans, like every other figure: the serif heading face reads as
+           decoration at this size. */
+        font-family: var(--font-body);
+        font-size: 3rem;
+        font-weight: 600;
+        line-height: 1;
+        color: var(--color-primary);
+    }
+
+    & > .error-message {
+        margin: 0.75rem 0 0;
+        color: var(--color-text-muted);
+    }
+}
+
+/* ==========================================================================
+   Empty state — shown where a selection is expected but absent
+   ========================================================================== */
+
+.empty-state {
+    padding: 3rem var(--gap);
+    background-color: var(--color-section);
+    border-radius: var(--radius);
+    color: var(--color-text-muted);
+    text-align: center;
+}
