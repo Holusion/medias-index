@@ -37,7 +37,7 @@ jobs:
       MEDIAS_INDEX_TEST_PASSWORD: root
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -60,9 +60,9 @@ jobs:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    environment: production
+    environment: medias.holusion.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -75,33 +75,54 @@ jobs:
         # ~25 transitive packages never reach the hosting space.
         run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
+      - name: Stage the deployment payload
+        # An allowlist rather than a list of exclusions: what is not named here
+        # cannot reach the server, so adding a directory to the repository is
+        # safe by default. dist/ is exactly the intended state of www/app/.
+        run: |
+          mkdir -p dist/config
+          cp -r public src templates db bin vendor dist/
+          cp composer.json composer.lock .htaccess dist/
+          cp config/config.example.php dist/config/
+
       - name: Upload to OVH
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          protocol: sftp
-          port: 22
-          server: ${{ secrets.SFTP_HOST }}
-          username: ${{ secrets.SFTP_USER }}
-          password: ${{ secrets.SFTP_PASSWORD }}
-          local-dir: ./
-          # Trailing slash is required by the action.
-          server-dir: www/app/
-          # Only changed files are transferred; the action keeps a state file
-          # on the server to work out the diff.
-          state-name: .deploy-state.json
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/docker/**
-            **/dev/**
-            **/docs/**
-            **/tests/**
-            **/config/config.php
-            **/config/config.dev.php
-            **/compose.yml
-            **/phpunit.xml.dist
-            **/var/**
-            **/.editorconfig
-            **/files/**
-            **/thumbs/**
+        # With --no-dev the payload is under a hundred files, so there is
+        # nothing to gain from incremental transfer: every deploy mirrors the
+        # whole tree and the result never depends on remembered state.
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_KEY: ${{ secrets.SFTP_KEY }}
+          # ssh-keyscan -t ed25519 <host>. Without it a machine in the path
+          # could take the deployment; the run fails rather than trusting blind.
+          SFTP_HOST_KEY: ${{ secrets.SFTP_HOST_KEY }}
+        run: |
+          # --delete below would empty www/app if staging had silently produced
+          # nothing, and this deployment is the only way back.
+          test -f dist/public/index.php
+
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lftp
+
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SFTP_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SFTP_HOST_KEY" > ~/.ssh/known_hosts
+
+          # --delete drops whatever is no longer in the repository, including
+          # the .deploy-state.json left behind by the previous deploy action.
+          # Nothing on the host lives inside app/: the configuration sits above
+          # the document root and files/ and thumbs/ are siblings of app/.
+          # The exception is .ssh: the deploy account is jailed to app/, which is
+          # therefore also its home, so its authorized_keys sits in the mirrored
+          # tree. Exclusions protect against deletion as well as upload.
+          # The password is a placeholder that is never sent: authentication
+          # happens inside connect-program, with the key. lftp still refuses to
+          # open the connection without one, falling back to anonymous login.
+          lftp -c "
+            set cmd:fail-exit yes;
+            set net:max-retries 2;
+            set sftp:connect-program 'ssh -a -x -i ~/.ssh/deploy_key -o IdentitiesOnly=yes';
+            open -u \"$SFTP_USER\",unused sftp://$SFTP_HOST;
+            mirror --reverse --delete --parallel=4 --verbose --exclude '^\.ssh' dist/ ~/;
+          "
