@@ -44,8 +44,13 @@ final class Router
      */
     public function dispatch(Request $request): ?Response
     {
+        // HEAD is GET without the body. Anything that speaks HTTP expects that —
+        // link checkers, proxies, uptime monitors — and answering 404 to it while
+        // GET returns 200 is its own kind of lie.
+        $method = $request->method === 'HEAD' ? 'GET' : $request->method;
+
         foreach ($this->routes as $route) {
-            if ($route['method'] !== $request->method) {
+            if ($route['method'] !== $method) {
                 continue;
             }
 

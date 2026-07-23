@@ -66,3 +66,39 @@ ErrorDocument 503 /error/503
 
 # Directory listings of the content tree are not wanted; the app is the index.
 Options -Indexes
+
+# --- Caching -----------------------------------------------------------------
+#
+# Deliberately here rather than in a .htaccess inside files/: that directory is
+# written by whatever uploads content, and a mirroring upload would delete the
+# file. Rules that must not disappear do not belong in the directory they
+# govern. It costs nothing either — Apache already walks every parent directory
+# looking for .htaccess on each request, so adding files further down would only
+# add lookups.
+<IfModule mod_headers.c>
+    # Thumbnails are content-addressed: the filename carries a digest of the
+    # source path, its mtime and size, and the thumbnail settings, so changing
+    # any of them produces a different name and the old file is deleted. A given
+    # URL therefore never changes content, which is exactly what "immutable"
+    # promises.
+    <If "%{REQUEST_URI} =~ m#^/thumbs/#">
+        Header always set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+
+    # Content is NOT content-addressed: re-uploading a media replaces files at
+    # the same URLs. So this is generous but bounded, and revalidation still
+    # applies afterwards through the ETag and Last-Modified that Apache already
+    # sends — a client past the deadline gets a cheap 304, not a full transfer.
+    <If "%{REQUEST_URI} =~ m#^/files/#">
+        Header always set Cache-Control "public, max-age=86400"
+    </If>
+
+    # Except the files that *define* a media — its entry page and its manifests.
+    # These are what change when content is re-uploaded, and an embed pointing at
+    # a stale one keeps showing the previous version. Kept short so a re-upload
+    # becomes visible in minutes rather than a day. Later in the file than the
+    # rule above on purpose: this one wins.
+    <If "%{REQUEST_URI} =~ m#^/files/.*\.(html?|xml|json)$#">
+        Header always set Cache-Control "public, max-age=300, must-revalidate"
+    </If>
+</IfModule>

@@ -34,7 +34,7 @@ final readonly class ErrorPage
         $status = isset(self::MESSAGES[$status]) ? $status : 500;
         [$title, $message] = self::MESSAGES[$status];
 
-        return Response::html(
+        $response = Response::html(
             $this->view->render('layout', [
                 'title' => $title,
                 'breadcrumb' => [],
@@ -46,6 +46,15 @@ final readonly class ErrorPage
                 ]),
             ]),
             $status,
+        );
+
+        // Errors are the most transient thing this app serves: a 404 stops being
+        // true the moment the content is re-indexed. Content under /files/ is
+        // cached generously, and a cached error page would outlive its cause.
+        return new Response(
+            $response->body,
+            $response->status,
+            [...$response->headers, 'Cache-Control' => 'no-store'],
         );
     }
 }

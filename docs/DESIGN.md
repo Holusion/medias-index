@@ -193,6 +193,37 @@ than strings, and `Urls` owns every link the pages emit — including the rule t
 an `index.html` entry point links to its directory, which had already been
 duplicated twice before it had a home.
 
+### Caching
+
+Content and thumbnails are served by Apache, so their cache headers live in
+`www/.htaccess` — **not** in a `.htaccess` inside `files/`. That directory is
+written by whatever uploads content, and a mirroring upload would delete a rule
+file sitting in it; rules that must not disappear do not belong in the directory
+they govern. There is no cost to keeping them at the root either, since Apache
+already walks every parent directory looking for `.htaccess` on each request.
+
+| What | Header | Why |
+|---|---|---|
+| `/thumbs/` | `max-age=31536000, immutable` | the filename carries a digest of the source path, mtime, size and thumbnail settings, so a URL's content never changes |
+| `/files/` | `max-age=86400` | not content-addressed — re-uploading replaces files at the same URLs |
+| `/files/**.{html,xml,json}` | `max-age=300, must-revalidate` | these *define* a media; a stale one keeps an embed showing the previous version |
+| error pages | `no-store` | a 404 stops being true the moment the content is indexed |
+
+The bounded figure for `/files/` is the point: an aggressive cache there would
+serve the previous upload for a year. Once the deadline passes, revalidation is
+still cheap — Apache's `ETag` and `Last-Modified` turn the follow-up into a 304
+rather than a full transfer.
+
+A media's link is its *directory* URL, which does not end in `.html`; it lands in
+the short bucket anyway because `DirectoryIndex` issues an internal redirect to
+`index.html` and the rules are re-evaluated against that path.
+
+One bound worth knowing on `immutable`: the thumbnail digest covers the source's
+mtime and size, not its bytes. A source edited in place to exactly the same size
+with its mtime restored would keep its old thumbnail — and with `immutable`,
+indefinitely in browsers that already have it. Hashing the contents instead would
+mean reading every candidate image on every scan.
+
 ### Errors
 
 Every error renders the same themed page, built by `ErrorPage`, whatever raised

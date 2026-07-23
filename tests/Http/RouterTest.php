@@ -52,6 +52,22 @@ final class RouterTest extends TestCase
         self::assertSame('scanned', $this->router()->dispatch(Request::create('POST', '/hook/scan'))?->body);
     }
 
+    /**
+     * HEAD is GET without the body. Answering 404 to it while GET returns 200
+     * misleads every link checker, proxy and uptime monitor that uses it.
+     */
+    public function testHeadIsServedByTheMatchingGetRoute(): void
+    {
+        self::assertSame('home', $this->router()->dispatch(Request::create('HEAD', '/'))?->body);
+        self::assertSame('acme', $this->router()->dispatch(Request::create('HEAD', '/c/acme'))?->body);
+    }
+
+    /** A HEAD must not reach a route that only accepts POST. */
+    public function testHeadDoesNotReachAPostOnlyRoute(): void
+    {
+        self::assertNull($this->router()->dispatch(Request::create('HEAD', '/hook/scan')));
+    }
+
     public function testUnknownPathReturnsNullSoTheCallerDecides(): void
     {
         self::assertNull($this->router()->dispatch(Request::create('GET', '/nope')));

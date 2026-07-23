@@ -91,6 +91,13 @@ the app, so errors Apache answers by itself — most often a stale link to a med
 that has since been deleted, served straight from `/files/` — get the
 application's error page instead of the bare server default.
 
+It also sets the cache headers for `/files/` and `/thumbs/`, which Apache serves
+without PHP: a year and `immutable` for thumbnails, whose filenames are
+content-addressed; a day for content, dropping to five minutes for the `.html`,
+`.xml` and `.json` that define a media, so a re-upload becomes visible quickly.
+See [`docs/DESIGN.md`](docs/DESIGN.md) for why these are not in a `.htaccess`
+inside `files/`.
+
 **3. Configuration.** Copy `config/config.example.php` to the first of these
 locations your host allows, then fill it in:
 
