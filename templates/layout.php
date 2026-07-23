@@ -21,6 +21,11 @@ $bodyModifiers ??= '';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $this->e($title) ?> — medias-index</title>
     <link rel="stylesheet" href="/assets/css/main.css">
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+    <?php // Inline and in the head, so script-only controls are revealed before
+          // the first paint rather than flashing into view afterwards. ?>
+    <script>document.documentElement.classList.add('has-js');</script>
+    <script src="/assets/js/app.js" defer></script>
 </head>
 <body>
 <div class="page">

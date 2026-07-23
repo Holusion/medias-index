@@ -11,13 +11,18 @@ use MediasIndex\Http\Controller\AdminController;
 use MediasIndex\Http\Controller\ClientController;
 use MediasIndex\Http\Controller\DoctorController;
 use MediasIndex\Http\Controller\ErrorController;
+use MediasIndex\Http\Controller\ScanController;
 use MediasIndex\Http\Controller\StyleguideController;
+use MediasIndex\Indexer\Scanner;
+use MediasIndex\Indexer\ScannerFactory;
 use MediasIndex\Search\LikeSearch;
 use MediasIndex\Storage\ClientRepository;
 use MediasIndex\Storage\MediaRepository;
 use MediasIndex\Storage\ProjectRepository;
+use MediasIndex\Storage\ScanRepository;
 use MediasIndex\Support\Config;
 use MediasIndex\Support\Database;
+use MediasIndex\View\Embed;
 use MediasIndex\View\Urls;
 use MediasIndex\View\View;
 use Throwable;
@@ -51,18 +56,30 @@ final class Application
             $config->url('urls.origin'),
         );
 
-        // Templates reach the URL builder through this rather than through a
-        // global; every render() call inherits it.
-        $view = new View(Config::rootDir() . '/templates', ['urls' => $urls]);
+        // Templates reach these through the shared data rather than a global;
+        // every render() call inherits them.
+        $view = new View(Config::rootDir() . '/templates', [
+            'urls' => $urls,
+            'embed' => new Embed(
+                $config->int('embed.width', 800),
+                $config->int('embed.height', 600),
+            ),
+        ]);
 
         $clients = new ClientRepository($pdo);
         $projects = new ProjectRepository($pdo);
         $medias = new MediaRepository($pdo, new LikeSearch());
 
-        $admin = new AdminController($clients, $view, $guard);
+        $admin = new AdminController($clients, new ScanRepository($pdo), $view, $guard);
         $client = new ClientController($clients, $projects, $medias, $view, $guard);
         $styleguide = new StyleguideController($clients, $view, $guard);
         $doctor = new DoctorController($guard);
+        $scan = new ScanController(
+            static fn (): Scanner => ScannerFactory::create($config, $pdo),
+            $guard,
+            $config->string('hook.token', ''),
+            $config->url('urls.origin'),
+        );
         $errorPage = new ErrorPage($view);
         $errors = new ErrorController($errorPage);
 
@@ -71,6 +88,8 @@ final class Application
         $router->get('/c/{client}', $client->show(...));
         $router->get('/styleguide', $styleguide->show(...));
         $router->get('/doctor', $doctor->show(...));
+        $router->post('/scan', $scan->trigger(...));
+        $router->post('/hook/scan', $scan->hook(...));
         // Where Apache's ErrorDocument directives point; see deploy/www.htaccess.
         $router->get('/error/{status}', $errors->show(...));
 

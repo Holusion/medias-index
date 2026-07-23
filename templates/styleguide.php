@@ -21,7 +21,7 @@ use MediasIndex\Indexer\MediaType;
     <button class="btn" disabled>Désactivé</button>
 </p>
 
-<h2>Types de media</h2>
+<h2>Types de média</h2>
 <p class="toolbar">
     <?php foreach ([MediaType::UNKNOWN, MediaType::HTML, MediaType::KRPANO] as $type) { ?>
         <?= $this->render('partials/badge', ['type' => $type]) ?>
@@ -35,7 +35,7 @@ use MediasIndex\Indexer\MediaType;
 
 <h2>Statistiques</h2>
 <?= $this->render('partials/stats', [
-    'figures' => ['Libellé' => '1 284', 'Avec unité' => '12,9 Mio'],
+    'figures' => ['Libellé' => '1 284', 'Avec unité' => '12,9 Mo'],
 ]) ?>
 
 <h2>Texte</h2>

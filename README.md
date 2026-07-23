@@ -52,9 +52,22 @@ it is safe; delete `files/` to start over.
 
 ## Deployment
 
-Pushing to `main` runs the tests, then uploads to `www/app` over SFTP
-(`.github/workflows/deploy.yml`). Repository secrets required: `SFTP_HOST`,
-`SFTP_USER`, `SFTP_PASSWORD`.
+Pushing to `main` runs the tests, then mirrors `www/app` over SFTP
+(`.github/workflows/deploy.yml`). Every deploy uploads the whole tree — with
+`--no-dev` it is under a hundred files — and deletes anything the repository no
+longer contains, so the result never depends on state remembered from the last
+run. Nothing the host owns lives inside `app/`.
+
+Migrations are deliberately not part of it: when a release adds one, run
+`php bin/migrate.php` on the host by hand.
+
+Repository secrets required:
+
+| | |
+|---|---|
+| `SFTP_HOST`, `SFTP_USER` | the deploy account |
+| `SFTP_KEY` | private half of the deploy key pair |
+| `SFTP_HOST_KEY` | `ssh-keyscan -t ed25519 <host>`; without it a machine in the path could take over the deployment |
 
 ### One-time setup on the host
 
@@ -98,6 +111,23 @@ php bin/doctor.php
 `bin/doctor.php` checks PHP, extensions, paths and connectivity, reports which
 config file was loaded, and warns if it sits somewhere a deploy could delete or a
 URL could reach. It also answers at `/doctor` over HTTP.
+
+**5. Deploy key.**
+
+```bash
+ssh-keygen -t ed25519 -N '' -f deploy_key -C 'github-actions medias-index'
+```
+
+The public half goes in the deploy account's `authorized_keys`, the private half
+into the `SFTP_KEY` secret. The deploy account stays restricted to SFTP and
+jailed to `www/app`: a key that can write there can already have PHP run
+whatever it likes, but the jail still keeps the credential away from the
+configuration above the document root — and keeps a mistake in the deploy script
+from reaching the rest of the account.
+
+Keep `authorized_keys` out of the jail — `AuthorizedKeysFile
+/etc/ssh/authorized_keys/%u` in `sshd_config`, owned by root. Inside it, the
+deploy account could append keys to its own file over SFTP.
 
 ## Indexing
 

@@ -41,6 +41,26 @@ $warn = static function (string $label, string $detail) use (&$warnings, $line):
     $line('WARN', $label, $detail);
 };
 
+/**
+ * The account this check is running as.
+ *
+ * Worth naming, because the same check answers differently from the CLI and
+ * over HTTP when cron and the web server run as different users — which reads
+ * as a contradiction until you can see who asked.
+ */
+function processUser(): string
+{
+    if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+        $user = posix_getpwuid(posix_geteuid());
+
+        if (is_array($user) && isset($user['name'])) {
+            return (string) $user['name'];
+        }
+    }
+
+    return (string) (getenv('USER') ?: getenv('USERNAME') ?: 'the current user');
+}
+
 // --- PHP itself --------------------------------------------------------------
 
 $report('php version', PHP_VERSION_ID >= 80200, PHP_VERSION . ' (need >= 8.2)');
@@ -120,7 +140,36 @@ if ($config !== null) {
         @mkdir($thumbs, 0o775, true);
     }
 
-    $report('thumbs directory', is_dir($thumbs) && is_writable($thumbs), $thumbs);
+    $report('thumbs directory', is_dir($thumbs) && is_readable($thumbs), $thumbs);
+
+    // Only whatever runs bin/scan.php writes here — Apache serves the files
+    // without PHP touching them. So a web request finding the directory
+    // read-only is normal wherever scans run under a different account, and a
+    // warning rather than a failure. It stops being cosmetic once POST
+    // /hook/scan exists, since that scans from the web process.
+    if (is_dir($thumbs)) {
+        is_writable($thumbs)
+            ? $report('thumbs writable', true, 'by ' . processUser())
+            : $warn(
+                'thumbs writable',
+                sprintf(
+                    'not by %s — only the account running bin/scan.php needs this,'
+                    . ' but the POST hook will scan as this one',
+                    processUser(),
+                ),
+            );
+    }
+
+    // The copied links and embed snippets are used away from this site, so a
+    // missing origin makes them relative and useless the moment they are pasted.
+    $origin = $config->string('urls.origin', '');
+    $originIsSet = $origin !== '' && !str_contains($origin, 'example.com');
+
+    if ($originIsSet) {
+        $report('public origin', true, $origin);
+    } else {
+        $warn('public origin', 'set urls.origin, or embed snippets will not work off-site');
+    }
 
     $tokenIsSet = $config->string('hook.token') !== 'CHANGE_ME';
     $report(

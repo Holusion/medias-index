@@ -21,6 +21,8 @@ final readonly class Request
         public string $path,
         private array $query,
         private array $post,
+        /** Origin header, when the browser sent one. */
+        private ?string $origin = null,
         /**
          * Set when Apache is serving this request as an ErrorDocument, to the
          * status that caused it. Null on an ordinary request.
@@ -31,16 +33,22 @@ final readonly class Request
 
     public static function fromGlobals(): self
     {
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+
         return self::create(
             strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')),
             (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/'),
             array_map(strval(...), $_GET),
             array_map(strval(...), $_POST),
-            self::redirectStatus(),
+            errorStatus: self::redirectStatus(),
+            origin: is_string($origin) && $origin !== '' ? $origin : null,
         );
     }
 
     /**
+     * Named arguments beyond the first four, so inserting one cannot silently
+     * shift the meaning of an existing call.
+     *
      * @param array<string, string> $query
      * @param array<string, string> $post
      */
@@ -50,8 +58,22 @@ final readonly class Request
         array $query = [],
         array $post = [],
         ?int $errorStatus = null,
+        ?string $origin = null,
     ): self {
-        return new self(strtoupper($method), self::normalisePath($path), $query, $post, $errorStatus);
+        return new self(
+            strtoupper($method),
+            self::normalisePath($path),
+            $query,
+            $post,
+            origin: $origin,
+            errorStatus: $errorStatus,
+        );
+    }
+
+    /** Where a browser says the request came from, if it said. */
+    public function origin(): ?string
+    {
+        return $this->origin;
     }
 
     /**

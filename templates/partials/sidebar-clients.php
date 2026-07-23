@@ -11,7 +11,7 @@ use MediasIndex\View\Format;
 
 $current ??= null;
 ?>
-<p class="sidebar-title">Clients</p>
+<?= $this->render('partials/sidebar-crumbs') ?>
 <ul class="item-list">
     <?php foreach ($clients as $client) { ?>
         <li>
@@ -19,7 +19,8 @@ $current ??= null;
                href="<?= $this->e($urls->client($client->slug)) ?>">
                 <span class="item-name"><?= $this->e($client->name) ?></span>
                 <span class="item-meta">
-                    <?= $client->projectCount ?> projet(s) · <?= $this->e(Format::bytes($client->sizeBytes)) ?>
+                    <?= $this->e(Format::plural($client->projectCount, 'projet', 'projets', 'pas de projet')) ?>
+                    · <?= $this->e(Format::bytes($client->sizeBytes)) ?>
                 </span>
             </a>
         </li>

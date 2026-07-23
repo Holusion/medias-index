@@ -39,6 +39,15 @@ final readonly class Response
         );
     }
 
+    /**
+     * 303 by default: after a POST that did something, the browser must follow
+     * up with a GET, so a refresh cannot repeat the action.
+     */
+    public static function redirect(string $location, int $status = 303): self
+    {
+        return new self('', $status, ['Location' => $location]);
+    }
+
     public function send(): void
     {
         http_response_code($this->status);

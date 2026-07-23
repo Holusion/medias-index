@@ -16,20 +16,20 @@ use MediasIndex\View\Format;
 <h1><?= $this->e($clientSlug) ?></h1>
 
 <?php if ($selected === null || $medias === null) { ?>
-    <div class="empty-state">Sélectionnez un projet.</div>
 
     <?php if ($clientTotals !== null) {
         echo $this->render('partials/stats', [
             'figures' => [
                 'Taille' => Format::bytes($clientTotals->sizeBytes),
-                'Projets' => (string) $clientTotals->projectCount,
-                'Medias' => (string) $clientTotals->mediaCount,
+                'Projets' => Format::number($clientTotals->projectCount),
+                'Médias' => Format::number($clientTotals->mediaCount),
                 'Créé le' => Format::day($clientTotals->ctime),
                 'Modifié le' => Format::day($clientTotals->mtime),
             ],
         ]);
-    }
-
+    }?>
+    <div class="empty-state">Sélectionnez un projet.</div>
+    <?php 
     return;
 } ?>
 
@@ -39,7 +39,8 @@ use MediasIndex\View\Format;
 <h2><?= $this->e($selected->name) ?></h2>
 
 <p class="muted">
-    <?= $medias->total ?> media(s) · <?= $this->e(Format::bytes($selected->sizeBytes)) ?> ·
+    <?= $this->e(Format::plural($medias->total, 'média', 'médias', 'pas de média')) ?>
+    · <?= $this->e(Format::bytes($selected->sizeBytes)) ?> ·
     modifié le <?= $this->e(Format::dateTime($selected->mtime)) ?>
     <?php foreach ($selected->types as $type) { ?>
         <?= $this->render('partials/badge', ['type' => $type]) ?>
@@ -58,3 +59,5 @@ use MediasIndex\View\Format;
     'medias' => $medias,
     'page' => $page,
 ]) ?>
+
+<?= $this->render('partials/embed-dialog') ?>

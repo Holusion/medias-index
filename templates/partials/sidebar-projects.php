@@ -11,7 +11,9 @@
 use MediasIndex\View\Format;
 
 ?>
-<p class="sidebar-title">Projets</p>
+<?= $this->render('partials/sidebar-crumbs', [
+    'trail' => [['label' => $clientSlug, 'href' => null]],
+]) ?>
 <ul class="item-list">
     <?php foreach ($projects as $project) { ?>
         <li>
@@ -19,7 +21,8 @@ use MediasIndex\View\Format;
                href="<?= $this->e($urls->project($clientSlug, $project->slug)) ?>">
                 <span class="item-name"><?= $this->e($project->name) ?></span>
                 <span class="item-meta">
-                    <?= $project->mediaCount ?> media(s) · <?= $this->e(Format::bytes($project->sizeBytes)) ?>
+                    <?= $this->e(Format::plural($project->mediaCount, 'média', 'médias', 'pas de média')) ?>
+                    · <?= $this->e(Format::bytes($project->sizeBytes)) ?>
                 </span>
             </a>
         </li>

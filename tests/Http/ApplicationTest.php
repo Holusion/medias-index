@@ -26,7 +26,12 @@ final class ApplicationTest extends DatabaseTestCase
                     'user' => (string) getenv('MEDIAS_INDEX_TEST_USER'),
                     'password' => (string) getenv('MEDIAS_INDEX_TEST_PASSWORD'),
                 ],
-                'urls' => ['files' => '/files', 'thumbs' => '/thumbs', 'origin' => ''],
+                'urls' => [
+                    'files' => '/files',
+                    'thumbs' => '/thumbs',
+                    'origin' => 'https://example.test',
+                ],
+                'embed' => ['width' => 800, 'height' => 600],
             ]),
             $guard,
         );
@@ -41,7 +46,7 @@ final class ApplicationTest extends DatabaseTestCase
         self::assertSame(200, $response->status);
         self::assertStringContainsString('Vue d&#039;ensemble', $response->body);
         self::assertStringContainsString('acme', $response->body);
-        self::assertStringContainsString('2,0 Kio', $response->body);
+        self::assertStringContainsString('2,0 Ko', $response->body);
     }
 
     public function testClientPageWithoutASelectionShowsTheTipAndTheTotals(): void
@@ -180,6 +185,95 @@ final class ApplicationTest extends DatabaseTestCase
             self::assertSame(403, $response->status, $path . ' must be guarded');
             self::assertStringContainsString('Accès refusé', $response->body);
         }
+    }
+
+    /** The empty case is the one a count helper gets wrong; check it renders. */
+    public function testCountsAgreeWithTheirNouns(): void
+    {
+        $now = time();
+        $this->pdo->exec(
+            "INSERT INTO clients (slug, name, first_seen_at, last_seen_at) VALUES ('vide','vide',{$now},{$now})",
+        );
+        $this->seedMedia('un', 'p', 'a');
+        $this->seedMedia('deux', 'p1', 'a');
+        $this->seedMedia('deux', 'p2', 'b');
+
+        $body = $this->app()->handle(Request::create('GET', '/'))->body;
+
+        self::assertStringContainsString('pas de projet', $body);
+        // \b so "21 projets" cannot satisfy the singular, (?!s) so the plural
+        // cannot satisfy it either.
+        self::assertMatchesRegularExpression('/\b1 projet(?!s)/', $body);
+        self::assertMatchesRegularExpression('/\b2 projets\b/', $body);
+        self::assertStringNotContainsString('projet(s)', $body);
+    }
+
+    public function testAUsableMediaOffersCopyAndEmbedActions(): void
+    {
+        $this->seedMedia('acme', 'expo', 'salle-1');
+
+        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+
+        self::assertStringContainsString('data-copy="https://example.test/files/acme/expo/salle-1/"', $body);
+        self::assertStringContainsString('data-embed="&lt;iframe src=', $body);
+        self::assertStringContainsString('<dialog id="embed-dialog"', $body);
+    }
+
+    /**
+     * Both the copied link and the snippet are used away from this page, so a
+     * relative URL would be useless the moment it is pasted.
+     */
+    public function testCopiedLinkAndEmbedUseTheAbsoluteOrigin(): void
+    {
+        $this->seedMedia('acme', 'expo', 'salle-1');
+
+        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+
+        self::assertStringContainsString('src=&quot;https://example.test/files/acme/expo/salle-1/&quot;', $body);
+    }
+
+    /** Nothing to link to means nothing to copy, embed or preview. */
+    public function testAnUnusableMediaOffersNoActions(): void
+    {
+        $this->seedMedia('acme', 'expo', 'broken', entryPath: null);
+
+        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+
+        self::assertStringNotContainsString('media-actions', $body);
+        self::assertStringNotContainsString('data-copy=', $body);
+        self::assertStringContainsString('<div class="media-thumb', $body, 'not a button');
+        self::assertStringNotContainsString('<button class="media-thumb', $body);
+    }
+
+    /**
+     * The thumbnail opens the same dialog as the button beside it, and the
+     * data-preview flag is the only difference: clicking a picture asks to see
+     * the thing, pressing the button asks for the markup.
+     */
+    public function testThePreviewableThumbnailIsAButtonCarryingTheEmbedData(): void
+    {
+        $this->seedMedia('acme', 'expo', 'salle-1');
+
+        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+
+        // No closing quote: a media without a thumbnail also carries is-empty.
+        self::assertStringContainsString('<button class="media-thumb', $body);
+        self::assertStringContainsString('data-preview', $body);
+        self::assertStringContainsString('aria-label="Aperçu de salle-1"', $body);
+        self::assertStringContainsString('data-embed-src="https://example.test/files/acme/expo/salle-1/"', $body);
+        self::assertStringContainsString('data-embed-width="800"', $body);
+        self::assertStringContainsString('data-embed-height="600"', $body);
+    }
+
+    /** The button must not carry it, or its dialog would open with a preview. */
+    public function testTheEmbedButtonDoesNotRequestAPreview(): void
+    {
+        $this->seedMedia('acme', 'expo', 'salle-1');
+
+        $body = $this->app()->handle(Request::create('GET', '/c/acme', ['p' => 'expo']))->body;
+
+        self::assertSame(1, substr_count($body, 'data-preview'));
+        self::assertStringContainsString('data-embed-preview-toggle', $body);
     }
 
     /** Media names come from disk and manifests, so they are never trusted. */

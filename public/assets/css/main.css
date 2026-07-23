@@ -193,6 +193,7 @@ a {
        separate from --btn-color so solid and outline can each stay legible. */
     --btn-outline-color: var(--color-primary);
 
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -371,15 +372,51 @@ a {
         background-color: var(--color-section);
         border-right: 1px solid var(--color-border);
 
-        & > .sidebar-title {
+        /* Says where the list below sits in the hierarchy, rather than just
+           naming it: home › client. */
+        & > .sidebar-crumbs {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            min-width: 0;
             margin: 0 0 0.5rem;
-            padding: 0 0.8rem;
+            padding: 0 0.8rem 0.5rem;
+            border-bottom: 1px solid var(--color-border);
             color: var(--color-text-muted);
-            font-family: var(--font-body);
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+            font-size: 0.8125rem;
+
+            & .crumb-home {
+                display: inline-flex;
+                flex: none;
+                color: var(--color-text-muted);
+
+                &:hover,
+                &:focus-visible {
+                    color: var(--color-primary);
+                }
+
+                & > .icon {
+                    display: block;
+                    width: 1rem;
+                    height: 1rem;
+                    /* currentColor, so the icon follows the link's own states. */
+                    fill: currentColor;
+                }
+            }
+
+            & .crumb-separator {
+                flex: none;
+                opacity: 0.6;
+            }
+
+            /* A long client name truncates instead of wrapping the trail. */
+            & .crumb-current {
+                overflow: hidden;
+                color: var(--color-text);
+                font-weight: 600;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
         }
     }
 
@@ -552,22 +589,59 @@ a {
 
     & .media {
         display: grid;
-        grid-template-columns: 120px minmax(0, 1fr);
+        grid-template-columns: 120px minmax(0, 1fr) auto;
         gap: var(--gap);
         align-items: center;
         padding: 0.7rem 0.8rem;
     }
 
+    /* Hidden until app.js has run: these do nothing without it, and a dead
+       button is worse than an absent one. */
+    & .media-actions {
+        display: none;
+        gap: 0.4rem;
+        align-items: center;
+    }
+
+    /* Also rendered as a <button> when the media can be previewed, hence the
+       reset: it must look identical either way. */
     & .media-thumb {
+        appearance: none;
+        padding: 0;
+        border: 0;
         aspect-ratio: 4 / 3;
         background-color: var(--color-element);
         border-radius: var(--radius);
         overflow: hidden;
 
+        &:is(button) {
+            cursor: pointer;
+
+            &:hover > img,
+            &:focus-visible > img {
+                opacity: 0.85;
+            }
+        }
+
         & > img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+
+        /* Nothing to show: a document outline, quiet enough to read as an
+           absence rather than as content. */
+        &.is-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            & > .icon-document {
+                width: 45%;
+                height: 45%;
+                color: var(--color-text-muted);
+                opacity: 0.55;
+            }
         }
     }
 
@@ -584,9 +658,18 @@ a {
         font-size: 0.8125rem;
     }
 
+    .has-js & .media-actions {
+        display: flex;
+    }
+
     @media (max-width: 768px) {
         & .media {
             grid-template-columns: 72px minmax(0, 1fr);
+        }
+
+        /* Too narrow for a third column; the actions take their own row. */
+        & .media-actions {
+            grid-column: 1 / -1;
         }
     }
 }
@@ -623,6 +706,145 @@ a {
     &.badge-krpano {
         --badge-color: var(--type-krpano);
     }
+}
+
+/* ==========================================================================
+   Dialog — native <dialog>, opened with showModal()
+
+   Escape and the backdrop close it for free; only the styling is ours.
+   ========================================================================== */
+
+.dialog {
+    width: min(100% - 2rem, 46rem);
+    /* The preview keeps the snippet's true proportions, which at 800×600 is
+       taller than a short window. Cap the panel and let it scroll rather than
+       pushing the code and the buttons off-screen. */
+    max-height: 90dvh;
+    overflow-y: auto;
+    padding: var(--gap);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background-color: var(--color-background);
+    color: var(--color-text);
+
+    &::backdrop {
+        background-color: rgba(0, 0, 0, 0.6);
+    }
+
+    & > .dialog-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--gap);
+
+        & h2 {
+            margin: 0 0 0.5rem;
+            padding-left: 0;
+            border-left: none;
+        }
+    }
+
+    /* The shared toolbar spacing would leave a gap below the last row. */
+    & > .toolbar:last-child {
+        margin-bottom: 0;
+    }
+
+    & > .dialog-preview {
+        margin: 0 0 var(--gap);
+        background-color: var(--color-element);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        overflow: hidden;
+
+        & > iframe {
+            display: block;
+            width: 100%;
+            /* Height comes from the aspect ratio app.js sets from the snippet's
+               own dimensions, so the preview is proportioned like the embed. */
+            border: 0;
+        }
+    }
+}
+
+/* A plain checkbox with the accent colour: no custom control to keep working. */
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 var(--gap);
+    font-size: 0.875rem;
+    cursor: pointer;
+
+    & > input {
+        accent-color: var(--color-primary);
+        cursor: pointer;
+    }
+}
+
+/* ==========================================================================
+   Code block — the embed snippet, meant to be read and copied
+   ========================================================================== */
+
+.code-block {
+    margin: 0 0 var(--gap);
+    padding: 0.75rem;
+    background-color: var(--color-element);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    /* Wrap rather than scroll: the whole point is to see all of it at once. */
+    white-space: pre-wrap;
+    word-break: break-all;
+    cursor: text;
+
+    &:focus-visible {
+        outline: 2px solid var(--color-primary-light);
+        outline-offset: 2px;
+    }
+
+    & ::selection {
+        background-color: var(--color-primary);
+        color: var(--holusion-black);
+    }
+}
+
+/* ==========================================================================
+   Transient feedback on a button that has just acted
+
+   The label is hidden rather than replaced, so it goes on reserving the width
+   it always had and the button cannot resize under the pointer — a control that
+   jumps as you click it is a control you mis-click next time. The message is
+   laid over it, which is why the feedback wording is kept shorter than any
+   label it covers.
+   ========================================================================== */
+
+.btn[data-feedback] {
+    & > .btn-label {
+        visibility: hidden;
+    }
+
+    &::after {
+        content: attr(data-feedback);
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+.btn.is-success {
+    --btn-color: var(--color-success);
+    --btn-outline-color: var(--color-success);
+    --btn-text-color: var(--holusion-black);
+}
+
+.btn.is-error {
+    --btn-color: var(--color-error);
+    --btn-outline-color: var(--color-error);
 }
 
 /* ==========================================================================
@@ -665,4 +887,5 @@ a {
     border-radius: var(--radius);
     color: var(--color-text-muted);
     text-align: center;
+    margin: var(--gap) 0;
 }

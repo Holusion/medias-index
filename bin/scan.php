@@ -14,16 +14,8 @@
 
 declare(strict_types=1);
 
-use MediasIndex\Indexer\MediaInspector;
-use MediasIndex\Indexer\Scanner;
+use MediasIndex\Indexer\ScannerFactory;
 use MediasIndex\Indexer\ScanScope;
-use MediasIndex\Indexer\ThumbnailGenerator;
-use MediasIndex\Indexer\Tree;
-use MediasIndex\Search\LikeSearch;
-use MediasIndex\Storage\ClientRepository;
-use MediasIndex\Storage\MediaRepository;
-use MediasIndex\Storage\ProjectRepository;
-use MediasIndex\Storage\ScanRepository;
 use MediasIndex\Support\Config;
 use MediasIndex\Support\Database;
 
@@ -53,21 +45,7 @@ try {
     $config = Config::load();
     $pdo = (new Database($config))->pdo();
 
-    $scanner = new Scanner(
-        new Tree($config->path('paths.files'), $config->array('scan.ignore')),
-        new MediaInspector(),
-        new ClientRepository($pdo),
-        new ProjectRepository($pdo),
-        new MediaRepository($pdo, new LikeSearch()),
-        new ScanRepository($pdo),
-        null,
-        new ThumbnailGenerator(
-            $config->path('paths.thumbs'),
-            $config->int('thumbnails.width', 400),
-            $config->int('thumbnails.height', 300),
-            $config->int('thumbnails.quality', 80),
-        ),
-    );
+    $scanner = ScannerFactory::create($config, $pdo);
 
     $result = $scanner->scan($scope, 'cli');
 

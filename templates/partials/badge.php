@@ -8,4 +8,5 @@
 use MediasIndex\View\Format;
 
 ?>
-<span class="badge badge-<?= $this->e(Format::typeModifier($type)) ?>"><?= $this->e($type) ?></span>
+<?php // Modifier from the raw identifier, label from the translation. ?>
+<span class="badge badge-<?= $this->e(Format::typeModifier($type)) ?>"><?= $this->e(Format::typeLabel($type)) ?></span>
